@@ -1,12 +1,11 @@
 import requests
 import time
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-def search_papers(query: str, limit: int = 10) -> list[dict]:
-    """
-    Search for research papers using the Semantic Scholar API.
-    Returns a list of papers with metadata.
-    """
+def search_papers(query: str, limit: int = 5) -> list[dict]:
     base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
 
     params = {
@@ -15,20 +14,36 @@ def search_papers(query: str, limit: int = 10) -> list[dict]:
         "fields": "title,authors,year,citationCount,externalIds,abstract,url"
     }
 
+    headers = {
+        "x-api-key": os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    }
+
+    time.sleep(1)
+
     for attempt in range(3):
-        response = requests.get(base_url, params=params)
+        response = requests.get(base_url, params=params, headers=headers)
 
         if response.status_code == 429:
-            wait = 2 ** attempt  # 1s, 2s, 4s
+            wait = 5 * (2 ** attempt)
             print(f"Rate limited. Waiting {wait}s before retry...")
             time.sleep(wait)
             continue
 
         response.raise_for_status()
         data = response.json()
-        return data.get("data", [])
+        clean = []
+        for paper in data.get("data", []):
+            clean.append({
+                "title": paper.get("title"),
+                "year": paper.get("year"),
+                "citationCount": paper.get("citationCount"),
+                "url": paper.get("url"),
+                "abstract": (paper.get("abstract") or "")[:300],
+                "authors": [a["name"] for a in paper.get("authors", [])]
+            })
+        return clean
 
-    return []
+    return [{"error": "No results found. Do not invent papers. Tell the user the search failed."}]
 
 
 def filter_papers(
