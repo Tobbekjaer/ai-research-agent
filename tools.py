@@ -88,6 +88,35 @@ def filter_papers(
 
     return filtered
 
+def verify_paper(
+    paper: dict,
+    min_citations: int = None,
+    max_citations: int = None,
+    year_after: int = None,
+    year_before: int = None,
+    exact_year: int = None
+) -> dict:
+    """
+    Verify a single paper meets all constraints.
+    Returns the paper if valid, or an error dict if not.
+    """
+    year = paper.get("year")
+    citations = paper.get("citationCount")
+
+    if min_citations is not None and (citations is None or citations < min_citations):
+        return {"error": f"Paper rejected: citation count {citations} is below minimum {min_citations}"}
+
+    if year_after is not None and (year is None or year <= year_after):
+        return {"error": f"Paper rejected: year {year} is not after {year_after}"}
+
+    if year_before is not None and (year is None or year >= year_before):
+        return {"error": f"Paper rejected: year {year} is not before {year_before}"}
+
+    if exact_year is not None and year != exact_year:
+        return {"error": f"Paper rejected: year {year} does not match {exact_year}"}
+
+    return paper
+
 if __name__ == "__main__":
     results = search_papers("LLM agents software engineering", limit=3)
     for paper in results:
@@ -97,3 +126,4 @@ if __name__ == "__main__":
 
     filtered = filter_papers(results, min_citations=10, year_after=2022)
     print(f"Filtered: {len(filtered)} papers")
+
