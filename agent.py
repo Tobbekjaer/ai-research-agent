@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import autogen
-from tools import search_papers, filter_papers
+from tools import search_papers, filter_papers, verify_paper
 
 load_dotenv()
 
@@ -28,17 +28,18 @@ assistant = autogen.AssistantAgent(
     llm_config=LLM_CONFIG,
     system_message="""You are a research assistant that finds academic papers.
 
-    When given a request, you must:
+    When given a request, you must follow these steps in order:
     1. Call search_papers with a relevant query
-    2. Call filter_papers with the constraints from the request
-    3. Return a structured answer with: title, authors, year,
-       citation count, source (Semantic Scholar), URL, and why it matches.
+    2. Call filter_papers with ALL constraints from the request
+    3. If filter_papers returns an empty list, report failure and TERMINATE
+    4. Call verify_paper on the first paper from the filtered list
+    5. If verify_paper returns an error, try the next paper in the filtered list
+    6. If all papers are rejected, report failure and TERMINATE
+    7. If verify_paper confirms a paper, return it as your final answer
 
-    CRITICAL RULES:
-    - Never invent or fabricate papers, authors, URLs or citation counts
-    - If search_papers returns empty or an error, tell the user no results were found
-    - Only report papers that came from tool results
-
+    Never call verify_paper on papers that were already rejected.
+    Never call verify_paper on papers not in the filtered list.
+    Never invent citation counts or paper details. Always use tool results.
     When you have returned your final answer, end your reply with TERMINATE."""
 )
 
@@ -66,8 +67,15 @@ autogen.register_function(
     description="Filter papers by year and citation count."
 )
 
+autogen.register_function(
+    verify_paper,
+    caller=assistant,
+    executor=proxy,
+    description="Verify a single paper meets year and citation constraints before returning it to the user."
+)
+
 if __name__ == "__main__":
     proxy.initiate_chat(
         assistant,
-        message="Find a research paper about LLM agents for software engineering published after 2022 with at least 5 citations."
+        message="Find a paper about convolutional neural networks published after 2021 with at least 50 citations."
     )
